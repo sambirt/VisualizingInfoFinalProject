@@ -1,149 +1,161 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>YouTube Top 100 Songs 2025 — Most Viewed (D3 v3)</title>
-  <script src="https://d3js.org/d3.v3.min.js"></script>
-  <style>
-    body {
-      font-family: "Segoe UI", sans-serif;
-      background: #fafafa;
-      margin: 40px;
-    }
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: "Helvetica Neue", sans-serif;
+    background: #fafafa;
+    margin: 40px;
+  }
 
-    h2 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
+  svg {
+    width: 1100px;
+    height: 600px;
+  }
 
-    svg {
-      display: block;
-      margin: auto;
-      background: white;
-      box-shadow: 0 0 10px rgba(0,0,0,0.1);
-      border-radius: 12px;
-    }
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: #999;
+    shape-rendering: crispEdges;
+  }
 
-    .bar {
-      fill: #69b3a2;
-      cursor: pointer;
-      transition: fill 0.2s;
-    }
+  .dot {
+    stroke: #333;
+    opacity: 0.8;
+  }
 
-    .bar:hover {
-      fill: #40916c;
-    }
+  .tooltip {
+    position: absolute;
+    text-align: left;
+    padding: 8px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    pointer-events: none;
+    font-size: 13px;
+    line-height: 1.4;
+  }
 
-    .tooltip {
-      position: absolute;
-      text-align: left;
-      padding: 8px;
-      background: white;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      pointer-events: none;
-      font-size: 13px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    }
-  </style>
-</head>
+  .title {
+    font-size: 18px;
+    margin-bottom: 10px;
+  }
+</style>
+
 <body>
-  <h2>YouTube Top 100 Songs (2025) — Most Viewed</h2>
-  <svg width="960" height="600"></svg>
-  <div class="tooltip" style="opacity:0;"></div>
-
+  <div class="title">YouTube Top Songs 2025: Views vs. Channel Followers</div>
+  <svg></svg>
+  <script src="https://d3js.org/d3.v3.min.js"></script>
   <script>
-    var margin = {top: 40, right: 20, bottom: 180, left: 100},
+    // Set up margins and dimensions
+    var margin = { top: 40, right: 180, bottom: 60, left: 80 },
         width = 960 - margin.left - margin.right,
         height = 600 - margin.top - margin.bottom;
 
     var svg = d3.select("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
       .append("g")
       .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    var tooltip = d3.select(".tooltip");
+    var tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
 
-    // Define scales (ordinal and linear for v3)
-    var x = d3.scale.ordinal().rangeRoundBands([0, width], 0.2);
-    var y = d3.scale.linear().range([height, 0]);
-
-    // Define axes
-    var xAxis = d3.svg.axis().scale(x).orient("bottom")
-      .tickFormat(function(d) { return d.length > 20 ? d.slice(0, 20) + "…" : d; });
-    var yAxis = d3.svg.axis().scale(y).orient("left")
-      .tickFormat(d3.format(".2s"));
-
-    // Load data
-    d3.csv("youtube-top-100-songs-2025.csv", function(error, data) {
-      if (error) throw error;
-
+    // Load the data
+    d3.csv("youtube-top-100-songs-2025.csv", function(data) {
       data.forEach(function(d) {
         d.view_count = +d.view_count;
+        d.channel_follower_count = +d.channel_follower_count;
       });
 
-      // Sort descending by view_count
-      data.sort(function(a, b) { return b.view_count - a.view_count; });
+      var x = d3.scale.log()
+        .domain(d3.extent(data, function(d) { return d.channel_follower_count; }))
+        .range([0, width]);
 
-      // Set scale domains
-      x.domain(data.map(function(d) { return d.title; }));
-      y.domain([0, d3.max(data, function(d) { return d.view_count; })]);
+      var y = d3.scale.log()
+        .domain(d3.extent(data, function(d) { return d.view_count; }))
+        .range([height, 0]);
 
-      // X-axis
+      var color = d3.scale.category10();
+
+      var xAxis = d3.svg.axis()
+        .scale(x)
+        .orient("bottom")
+        .ticks(10, ".1s");
+
+      var yAxis = d3.svg.axis()
+        .scale(y)
+        .orient("left")
+        .ticks(10, ".1s");
+
+      // X Axis
       svg.append("g")
         .attr("class", "x axis")
         .attr("transform", "translate(0," + height + ")")
         .call(xAxis)
-        .selectAll("text")
+        .append("text")
+        .attr("class", "label")
+        .attr("x", width)
+        .attr("y", -6)
         .style("text-anchor", "end")
-        .attr("dx", "-.8em")
-        .attr("dy", ".15em")
-        .attr("transform", "rotate(-45)");
+        .text("Channel Follower Count");
 
-      // Y-axis
+      // Y Axis
       svg.append("g")
         .attr("class", "y axis")
         .call(yAxis)
         .append("text")
         .attr("transform", "rotate(-90)")
-        .attr("y", -60)
+        .attr("y", 15)
         .attr("dy", ".71em")
         .style("text-anchor", "end")
-        .text("Views");
+        .text("Video View Count");
 
-      // Bars
-      svg.selectAll(".bar")
+      // Draw dots
+      svg.selectAll(".dot")
         .data(data)
-        .enter().append("rect")
-        .attr("class", "bar")
-        .attr("x", function(d) { return x(d.title); })
-        .attr("width", x.rangeBand())
-        .attr("y", function(d) { return y(d.view_count); })
-        .attr("height", function(d) { return height - y(d.view_count); })
+        .enter().append("circle")
+        .attr("class", "dot")
+        .attr("r", 6)
+        .attr("cx", function(d) { return x(d.channel_follower_count); })
+        .attr("cy", function(d) { return y(d.view_count); })
+        .style("fill", function(d) { return color(d.categories); })
         .on("mouseover", function(d) {
           tooltip.transition().duration(200).style("opacity", .9);
           tooltip.html(
             "<strong>" + d.title + "</strong><br/>" +
             "Channel: " + d.channel + "<br/>" +
-            "Views: " + d3.format(",")(d.view_count) + "<br/>" +
-            "Duration: " + d.duration_string
+            "Views: " + d.view_count.toLocaleString() + "<br/>" +
+            "Followers: " + d.channel_follower_count.toLocaleString()
           )
           .style("left", (d3.event.pageX + 10) + "px")
-          .style("top", (d3.event.pageY - 30) + "px");
+          .style("top", (d3.event.pageY - 28) + "px");
         })
         .on("mouseout", function() {
           tooltip.transition().duration(300).style("opacity", 0);
-        })
-        .on("click", function(d) {
-          window.open(d.channel_url, "_blank");
         });
 
-      // X-axis label
-      svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height + 140)
-        .attr("text-anchor", "middle")
-        .style("font-size", "13px")
-        .text("Song Title");
+      // Legend (moved outside to the right)
+      var legend = svg.selectAll(".legend")
+        .data(color.domain())
+        .enter().append("g")
+        .attr("class", "legend")
+        .attr("transform", function(d, i) {
+          return "translate(" + (width + 30) + "," + (i * 22) + ")";
+        });
+
+      legend.append("rect")
+        .attr("width", 18)
+        .attr("height", 18)
+        .style("fill", color);
+
+      legend.append("text")
+        .attr("x", 24)
+        .attr("y", 9)
+        .attr("dy", ".35em")
+        .style("text-anchor", "start")
+        .text(function(d) { return d; });
     });
   </script>
 </body>

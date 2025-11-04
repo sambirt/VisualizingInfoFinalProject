@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+  body {
+    font-family: "Helvetica Neue", sans-serif;
+    background: #fafafa;
+    margin: 40px;
+  }
+
+  svg {
+    width: 1100px;
+    height: 600px;
+  }
+
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: #999;
+    shape-rendering: crispEdges;
+  }
+
+  .dot {
+    stroke: #333;
+    opacity: 0.8;
+  }
+
+  .tooltip {
+    position: absolute;
+    text-align: left;
+    padding: 8px;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    pointer-events: none;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .title {
+    font-size: 18px;
+    margin-bottom: 10px;
+  }
+</style>
+
+<body>
+  <div class="title">YouTube Top Songs 2025: Views vs. Channel Followers</div>
+  <svg></svg>
+  <script src="https://d3js.org/d3.v3.min.js"></script>
+  <script>
+    // Set up margins and dimensions
+    var margin = { top: 40, right: 180, bottom: 60, left: 80 },
+        width = 960 - margin.left - margin.right,
+        height = 600 - margin.top - margin.bottom;
+
+    var svg = d3.select("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    var tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("opacity", 0);
+
+    // Load the data
+    d3.csv("youtube-top-100-songs-2025.csv", function(data) {
+      data.forEach(function(d) {
+        d.view_count = +d.view_count;
+        d.channel_follower_count = +d.channel_follower_count;
+      });
+
+      var x = d3.scale.log()
+        .domain(d3.extent(data, function(d) { return d.channel_follower_count; }))
+        .range([0, width]);
+
+      var y = d3.scale.log()
+        .domain(d3.extent(data, function(d) { return d.view_count; }))
+        .range([height, 0]);
+
+      var color = d3.scale.category10();
+
+      var xAxis = d3.svg.axis()
+        .scale(x)
+        .orient("bottom")
+        .ticks(10, ".1s");
+
+      var yAxis = d3.svg.axis()
+        .scale(y)
+        .orient("left")
+        .ticks(10, ".1s");
+
+      // X Axis
+      svg.append("g")
+        .attr("class", "x axis")
+        .attr("transform", "translate(0," + height + ")")
+        .call(xAxis)
+        .append("text")
+        .attr("class", "label")
+        .attr("x", width)
+        .attr("y", -6)
+        .style("text-anchor", "end")
+        .text("Channel Follower Count");
+
+      // Y Axis
+      svg.append("g")
+        .attr("class", "y axis")
+        .call(yAxis)
+        .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", 15)
+        .attr("dy", ".71em")
+        .style("text-anchor", "end")
+        .text("Video View Count");
+
+      // Draw dots
+      svg.selectAll(".dot")
+        .data(data)
+        .enter().append("circle")
+        .attr("class", "dot")
+        .attr("r", 6)
+        .attr("cx", function(d) { return x(d.channel_follower_count); })
+        .attr("cy", function(d) { return y(d.view_count); })
+        .style("fill", function(d) { return color(d.categories); })
+        .on("mouseover", function(d) {
+          tooltip.transition().duration(200).style("opacity", .9);
+          tooltip.html(
+            "<strong>" + d.title + "</strong><br/>" +
+            "Channel: " + d.channel + "<br/>" +
+            "Views: " + d.view_count.toLocaleString() + "<br/>" +
+            "Followers: " + d.channel_follower_count.toLocaleString()
+          )
+          .style("left", (d3.event.pageX + 10) + "px")
+          .style("top", (d3.event.pageY - 28) + "px");
+        })
+        .on("mouseout", function() {
+          tooltip.transition().duration(300).style("opacity", 0);
+        });
+
+      // Legend (moved outside to the right)
+      var legend = svg.selectAll(".legend")
+        .data(color.domain())
+        .enter().append("g")
+        .attr("class", "legend")
+        .attr("transform", function(d, i) {
+          return "translate(" + (width + 30) + "," + (i * 22) + ")";
+        });
+
+      legend.append("rect")
+        .attr("width", 18)
+        .attr("height", 18)
+        .style("fill", color);
+
+      legend.append("text")
+        .attr("x", 24)
+        .attr("y", 9)
+        .attr("dy", ".35em")
+        .style("text-anchor", "start")
+        .text(function(d) { return d; });
+    });
+  </script>
+</body>
+</html>
